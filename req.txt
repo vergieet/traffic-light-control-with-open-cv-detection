@@ -1,0 +1,5 @@
+cvlib
+Keras
+opencv-python
+tensorflow
+matplotlib
