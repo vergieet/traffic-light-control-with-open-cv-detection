@@ -1,9 +1,17 @@
 import time
 import math
 from traffic_resource_manager import TrafficLightResource
+import RPi.GPIO as GPIO
+from gpiozero import TrafficLights
+
+# Pin Definitons:
 
 class TrafficLightController:
     def __init__(self, traffic_resource):
+        self.west_lights = TrafficLights(4, 3, 2)
+        self.east_lights = TrafficLights(14, 15, 18)
+        self.north_lights = TrafficLights(17, 27, 22)
+        self.south_lights = TrafficLights(10, 9, 11)
         self.traffic_resource = traffic_resource
         self.traffic_lights = {
             "BARAT":{
@@ -48,6 +56,44 @@ class TrafficLightController:
         self.alreadyGreenLights = []
         self.prioritized_lamp = None
         self.lock_prioritized_lamp = False
+  
+    def yellow_delay_switch(self, from_light_key, to_light):
+        if from_light_key == "BARAT":
+            self.switch_lamp_yellow(to_light, self.west_lights)
+        elif from_light_key == "TIMUR":
+            self.switch_lamp_yellow(to_light, self.east_lights)
+        elif from_light_key == "SELATAN":
+            self.switch_lamp_yellow(to_light, self.south_lights)
+        elif from_light_key == "UTARA":
+            self.switch_lamp_yellow(to_light, self.north_lights)
+        time.sleep(2)
+
+    def traffic_switch(self, from_light_key, to_light_key):
+        if to_light_key == "BARAT":
+            self.yellow_delay_switch(from_light_key, self.west_lights)
+            self.switch_lamp_green(self.west_lights, [self.east_lights, self.north_lights, self.south_lights])
+        elif to_light_key == "TIMUR":
+            self.yellow_delay_switch(from_light_key, self.east_lights)
+            self.switch_lamp_green(self.east_lights, [self.west_lights, self.north_lights, self.south_lights])
+        elif to_light_key == "SELATAN":
+            self.yellow_delay_switch(from_light_key, self.south_lights)
+            self.switch_lamp_green(self.south_lights, [self.east_lights, self.north_lights, self.west_lights])
+        elif to_light_key == "UTARA":
+            self.yellow_delay_switch(from_light_key, self.north_lights)
+            self.switch_lamp_green(self.north_lights, [self.east_lights, self.west_lights, self.south_lights])
+    
+    def switch_lamp_green(self, to_green, to_reds):
+        to_green.off()
+        to_green.green.on()
+        for to_red in to_reds:
+            to_red.off()        
+            to_red.red.on()
+
+    def switch_lamp_yellow(self, green_to_red,red_to_green):
+        green_to_red.off()
+        green_to_red.amber.on()
+        red_to_green.off()
+        red_to_green.amber.on()
 
     def green(self, trafficLight):
         trafficLight["current_light"] = "green";
@@ -75,7 +121,7 @@ class TrafficLightController:
         if trafficPoint > self.traffic_lights[trafficToBeAdjusted]["minimum_traffic_point_to_recalculate"]:
             recalculationValue = math.ceil(trafficPoint * self.traffic_lights[trafficToBeAdjusted]["traffic_point_recalculation_multiplier"]);
             print("recalculation on-" + trafficToBeAdjusted +": " + str(recalculationValue))
-            # self.traffic_lights[trafficToBeAdjusted]["minimumGreenLightCount"] = recalculationValue
+            self.traffic_lights[trafficToBeAdjusted]["minimumGreenLightCount"] = recalculationValue
             print(trafficToBeAdjusted + str(self.traffic_lights[trafficToBeAdjusted]))
 
     
@@ -88,11 +134,18 @@ class TrafficLightController:
         trafficLight[(str(light) + "_start_time")] = 0;
 
     def tickTrafficLight(self):
-        print(self.traffic_resource.read_traffic_load());
+        # Do adjust green light based on traffic resource
+        for key, _ in self.traffic_lights.items():
+            if not key == self.trafficstate:
+                self.adjust_min_green_light(key, self.traffic_resource.read_traffic_load(key))
+                
+        #Traffic ticking systems
         for key, _ in self.traffic_lights.items():
             if key == self.trafficstate:
                 self.green(self.traffic_lights[key])
+                # Do prioritization if there is a lamp that need to be prioritized
                 if(not self.prioritized_lamp == None and self.already_fulfill_green_time(self.traffic_lights[key])):
+                    self.traffic_switch(self.prev_trafficstate, self.trafficstate)
                     self.prev_trafficstate = self.trafficstate
                     self.reset_count(self.traffic_lights[self.trafficstate], "green")
                     self.reset_count(self.traffic_lights[self.prioritized_lamp], "red")
@@ -119,6 +172,6 @@ class TrafficLightController:
                 # print(str(highest_red_time) + ":" +  str(self.traffic_lights[highest_red_time]["red_start_time"]))
             
             # print(self.prev_trafficstate + ":" + str(self.traffic_lights[self.prev_trafficstate]))
-            print(self.trafficstate + ":" + str(self.traffic_lights[self.trafficstate]))
+            # print(self.trafficstate + ":" + str(self.traffic_lights[self.trafficstate]))
             time.sleep(1)
             self.tickTrafficLight()

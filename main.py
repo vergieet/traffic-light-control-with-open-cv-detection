@@ -5,6 +5,7 @@ import multiprocessing
 multiprocessing.set_start_method("fork")
 
 q = multiprocessing.Queue()
+
 resource = TrafficLightResource(q)
 # Instantiate controller for traffic light
 controller = TrafficLightController(resource)
@@ -13,9 +14,9 @@ streamer = TrafficCCTVStreamer(resource)
 
 if __name__ == "__main__":
     jobs = []
-    # jobs.append(multiprocessing.Process(
-    #     target=controller.run, args=()
-    # ))
+    jobs.append(multiprocessing.Process(
+        target=controller.run, args=()
+    ))
     jobs.append(multiprocessing.Process(
         target=streamer.stream_traffic, args=()
     ))

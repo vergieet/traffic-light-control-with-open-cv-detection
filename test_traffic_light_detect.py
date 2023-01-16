@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import cvlib as cv
 from cvlib.object_detection import draw_bbox
 
-im = cv2.imread('media/alt_cctv.png')
+im = cv2.imread('media/TerusanDiengBarat.png')
 plt.imshow(im)
 plt.show()
 bbox, label, conf = cv.detect_common_objects(im)
